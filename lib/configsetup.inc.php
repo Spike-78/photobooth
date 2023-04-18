@@ -1835,6 +1835,13 @@ $configsetup = [
     'remotebuzzer' => [
         'view' => 'advanced',
         'platform' => 'linux',
+        'remotebuzzer_port' => [
+            'view' => 'expert',
+            'type' => 'number',
+            'placeholder' => $defaultConfig['remotebuzzer']['port'],
+            'name' => 'remotebuzzer[port]',
+            'value' => $config['remotebuzzer']['port'],
+        ],
         'remotebuzzer_usebuttons' => [
             'view' => 'advanced',
             'type' => 'checkbox',
@@ -2078,13 +2085,6 @@ $configsetup = [
             'type' => 'hidden',
             'name' => 'remotebuzzer[logfile]',
             'value' => $config['remotebuzzer']['logfile'],
-        ],
-        'remotebuzzer_port' => [
-            'view' => 'expert',
-            'type' => 'number',
-            'placeholder' => $defaultConfig['remotebuzzer']['port'],
-            'name' => 'remotebuzzer[port]',
-            'value' => $config['remotebuzzer']['port'],
         ],
     ],
     'synctodrive' => [
