@@ -8,7 +8,8 @@ let collageInProgress = false,
     rebootled,
     printled,
     videoled,
-    customled;
+    customled,
+    move2usbled;
 
 const API_DIR_NAME = 'api';
 const API_FILE_NAME = 'config.php';
@@ -97,6 +98,16 @@ function photoboothAction(type) {
             ioServer.emit('photobooth-socket', 'start-video');
             break;
 
+        case 'move2usb':
+            triggerArmed = false;
+            collageInProgress = false;
+            log('Photobooth trigger MOVE2USB : [ photobooth-socket ]  => [ All Clients ]: command [ move2usb ]');
+            if (config.remotebuzzer.useleds && config.remotebuzzer.move2usbled) {
+                move2usbled.writeSync(1);
+            }
+            ioServer.emit('photobooth-socket', 'move-2-usb');
+            break;
+
         case 'collage':
             triggerArmed = false;
             collageInProgress = true;
@@ -124,6 +135,9 @@ function photoboothAction(type) {
             }
             if (config.remotebuzzer.useleds && config.remotebuzzer.photolight) {
                 photolight.writeSync(0);
+            }
+            if (config.remotebuzzer.useleds && config.remotebuzzer.move2usbled) {
+                move2usbled.writeSync(0);
             }
             if (config.remotebuzzer.useleds && config.remotebuzzer.collageled) {
                 collageled.writeSync(0);
@@ -184,6 +198,7 @@ const requestListener = function (req, res) {
                 <li>Trigger custom: <a href="${baseUrl}/commands/start-custom" target="_blank">${baseUrl}/commands/start-custom</a></li>
                 <li>Trigger print: <a href="${baseUrl}/commands/start-print" target="_blank">${baseUrl}/commands/start-print</a></li>
                 <li>Trigger video: <a href="${baseUrl}/commands/start-video" target="_blank">${baseUrl}/commands/start-video</a></li>
+                <li>Trigger picture move to USB: <a href="${baseUrl}/commands/move-2-usb" target="_blank">${baseUrl}/commands/move-2-usb</a></li>
             </ul>
             <h1>Rotary Endpoints</h1>
             <ul>
@@ -263,6 +278,19 @@ const requestListener = function (req, res) {
                 sendText('Please enable Hardware Button support and Print Button!');
             }
             break;
+            case '/commands/move-2-usb':
+                log('http: GET /commands/move-2-usb');
+                if (config.remotebuzzer.usebuttons && config.remotebuzzer.move2usbbutton) {
+                    if (triggerArmed) {
+                        photoboothAction('move2usb');
+                        sendText('MOVE2USB TRIGGERED');
+                    } else {
+                        sendText('ALREADY TRIGGERED AN ACTION');
+                    }
+                } else {
+                    sendText('Please enable Hardware Button support and Move2USB Button!');
+                }
+                break;
         case '/commands/start-video':
             log('http: GET /commands/start-video');
             if (config.remotebuzzer.usebuttons && config.remotebuzzer.videobutton) {
@@ -391,6 +419,10 @@ ioServer.on('connection', function (client) {
                 photoboothAction('video');
                 break;
 
+            case 'move-2-usb':
+                photoboothAction('move2usb');
+                break;
+
             case 'collage-wait-for-next':
                 triggerArmed = true;
                 break;
@@ -479,6 +511,7 @@ if (useGpio) {
     gpioOpSanity(config.remotebuzzer.printledgpio);
     gpioOpSanity(config.remotebuzzer.shutdownledgpio);
     gpioOpSanity(config.remotebuzzer.rebootledgpio);
+    gpioOpSanity(config.remotebuzzer.move2usbledgpio);
 }
 
 /* BUTTON SEMAPHORE HELPER FUNCTION */
@@ -910,6 +943,47 @@ const watchPrintGPIO = function watchPrintGPIO(err, gpioValue) {
     }
 };
 
+/* WATCH FUNCTION MOVE2USB BUTTON */
+const watchMove2usbGPIO = function watchMove2usbGPIO(err, gpioValue) {
+    if (err) {
+        throw err;
+    }
+
+    /* if there is some activity in progress ignore GPIO pin for now */
+    if (!triggerArmed || buttonActiveCheck(config.remotebuzzer.move2usbgpio, gpioValue)) {
+        return;
+    }
+
+    if (gpioValue) {
+        /* Button released - raising flank detected */
+        const timeElapsed = buttonTimer();
+
+        if (timeElapsed) {
+            log('GPIO', config.remotebuzzer.move2usbgpio, '- Move2USB button released ', timeElapsed, ' [ms] ');
+            if (config.remotebuzzer.useleds && config.remotebuzzer.move2usbled) {
+                move2usbled.writeSync(0);
+            }
+
+            /* Start Print */
+            photoboothAction('move2usb');
+        } else {
+            /* Too long button press - timeout - reset server state machine */
+            log('GPIO', config.remotebuzzer.move2usbgpio, '- too long button press - Reset server state machine');
+            photoboothAction('reset');
+            buttonActiveCheck(-1, -1);
+            if (config.remotebuzzer.useleds && config.remotebuzzer.move2usbled) {
+                move2usbled.writeSync(0);
+            }
+        }
+    } else {
+        /* Button pressed - falling flank detected (pull to ground) */
+        log('GPIO', config.remotebuzzer.move2usbgpio, '- Move2USB button pressed');
+        if (config.remotebuzzer.useleds && config.remotebuzzer.move2usbled) {
+            move2usbled.writeSync(1);
+        }
+    }
+};
+
 /* WATCH FUNCTION ROTARY CLK */
 const watchRotaryClk = function watchRotaryClk(err, gpioValue) {
     if (err) {
@@ -1074,6 +1148,15 @@ if (useGpio) {
             log('Looking for Print Button on Raspberry GPIO', config.remotebuzzer.printgpio);
         }
 
+        /* Move2USB BUTTON */
+        if (config.remotebuzzer.move2usbbutton) {
+            const move2usbButton = new Gpio(config.remotebuzzer.move2usbgpio, 'in', 'both', {
+                debounceTimeout: config.remotebuzzer.debounce
+            });
+            move2usbButton.watch(watchMove2usbGPIO);
+            log('Looking for Move2USB Button on Raspberry GPIO', config.remotebuzzer.move2usbgpio);
+        }
+
         /* LED OUT SUPPORT */
         if (config.remotebuzzer.useleds) {
             /* Photo Light */
@@ -1122,6 +1205,12 @@ if (useGpio) {
             if (config.remotebuzzer.printled) {
                 printled = new Gpio(config.remotebuzzer.printledgpio, 'out');
                 log('LED for Print Button on Raspberry GPIO', config.remotebuzzer.printledgpio);
+            }
+
+            /* LED Move2USB BUTTON */
+            if (config.remotebuzzer.move2usbled) {
+                move2usbled = new Gpio(config.remotebuzzer.move2usbledgpio, 'out');
+                log('LED for Move2USB Button on Raspberry GPIO', config.remotebuzzer.move2usbledgpio);
             }
         }
     }
