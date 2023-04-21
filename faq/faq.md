@@ -381,7 +381,7 @@ LED                   Raspberry
 
 Photolight      ---   GPIO 25
 Picture LED     ---   GPIO 19
-Collage LED     ---   GPIO 22
+Collage LED     ---   GPIO 12
 Custom LED      ---   GPIO  5
 Video LED       ---   GPIO  7
 Shutdown LED    ---   GPIO  8
