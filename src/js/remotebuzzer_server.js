@@ -105,7 +105,7 @@ function photoboothAction(type) {
             if (config.remotebuzzer.useleds && config.remotebuzzer.move2usbled) {
                 move2usbled.writeSync(1);
             }
-            ioServer.emit('photobooth-socket', 'move-2-usb');
+            ioServer.emit('photobooth-socket', 'start-move2usb');
             break;
 
         case 'collage':
@@ -198,7 +198,7 @@ const requestListener = function (req, res) {
                 <li>Trigger custom: <a href="${baseUrl}/commands/start-custom" target="_blank">${baseUrl}/commands/start-custom</a></li>
                 <li>Trigger print: <a href="${baseUrl}/commands/start-print" target="_blank">${baseUrl}/commands/start-print</a></li>
                 <li>Trigger video: <a href="${baseUrl}/commands/start-video" target="_blank">${baseUrl}/commands/start-video</a></li>
-                <li>Trigger picture move to USB: <a href="${baseUrl}/commands/move-2-usb" target="_blank">${baseUrl}/commands/move-2-usb</a></li>
+                <li>Trigger picture move to USB: <a href="${baseUrl}/commands/start-move2usb" target="_blank">${baseUrl}/commands/start-move2usb</a></li>
             </ul>
             <h1>Rotary Endpoints</h1>
             <ul>
@@ -278,8 +278,8 @@ const requestListener = function (req, res) {
                 sendText('Please enable Hardware Button support and Print Button!');
             }
             break;
-            case '/commands/move-2-usb':
-                log('http: GET /commands/move-2-usb');
+            case '/commands/start-move2usb':
+                log('http: GET /commands/start-move2usb');
                 if (config.remotebuzzer.usebuttons && config.remotebuzzer.move2usbbutton) {
                     if (triggerArmed) {
                         photoboothAction('move2usb');
@@ -419,7 +419,7 @@ ioServer.on('connection', function (client) {
                 photoboothAction('video');
                 break;
 
-            case 'move-2-usb':
+            case 'start-move2usb':
                 photoboothAction('move2usb');
                 break;
 
