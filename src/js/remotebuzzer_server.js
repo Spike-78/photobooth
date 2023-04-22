@@ -13,8 +13,18 @@ let collageInProgress = false,
 
 const API_DIR_NAME = 'api';
 const API_FILE_NAME = 'config.php';
-const PID = process.pid;
+const SYNC_DESTINATION_DIR = 'photobooth-pic-sync';
+/*const PID = process.pid;*/
 let rotaryClkPin, rotaryDtPin;
+/*const {execSync, spawn} = require('child_process');*/
+const {execSync} = require('child_process');
+const path = require('path');
+/*const events = require('events');*/
+const {pid: PID, platform: PLATFORM} = process;
+/*const myEmitter = new events.EventEmitter();*/
+/*let rsyncSemaphore = null;*/
+/*let rsyncStartTime = 0;*/
+
 
 /* LOGGING FUNCTION */
 const log = function (...optionalParams) {
@@ -36,7 +46,7 @@ process.on('uncaughtException', function (err) {
 });
 
 /* SOURCE PHOTOBOOTH CONFIG */
-const {execSync} = require('child_process');
+/*const {execSync} = require('child_process');*/
 let cmd = `cd ${API_DIR_NAME} && php ./${API_FILE_NAME}`;
 let stdout = execSync(cmd).toString();
 const config = JSON.parse(stdout.slice(stdout.indexOf('{'), stdout.lastIndexOf(';')));
@@ -105,7 +115,7 @@ function photoboothAction(type) {
             if (config.remotebuzzer.useleds && config.remotebuzzer.move2usbled) {
                 move2usbled.writeSync(1);
             }
-            ioServer.emit('photobooth-socket', 'start-move2usb');
+            move2usbAction();
             break;
 
         case 'collage':
@@ -960,11 +970,11 @@ const watchMove2usbGPIO = function watchMove2usbGPIO(err, gpioValue) {
 
         if (timeElapsed) {
             log('GPIO', config.remotebuzzer.move2usbgpio, '- Move2USB button released ', timeElapsed, ' [ms] ');
-            if (config.remotebuzzer.useleds && config.remotebuzzer.move2usbled) {
-                move2usbled.writeSync(0);
-            }
+            /* if (config.remotebuzzer.useleds && config.remotebuzzer.move2usbled) { */
+            /*   move2usbled.writeSync(0); */
+            /*} */
 
-            /* Start Print */
+            /* Start Move2USB */
             photoboothAction('move2usb');
         } else {
             /* Too long button press - timeout - reset server state machine */
@@ -1217,5 +1227,227 @@ if (useGpio) {
 } else if (!config.remotebuzzer.usenogpio && !Gpio.accessible) {
     log('GPIO enabled but GPIO not accessible!');
 }
+
+/* Move2USB */
+function move2usbAction() {
+    if (config.remotebuzzer.useleds && config.remotebuzzer.move2usbled) {
+        move2usbled.writeSync(1);
+    }
+
+    log('Move2USB');
+   
+    const parseConfig = () => {
+        try {
+            return {
+                dataAbsPath: config.foldersAbs.data,
+                drive: config.synctodrive.target
+            };
+        } catch (err) {
+            log('ERROR: unable to parse sync-to-drive config', err);
+        }
+    
+        return null;
+    };
+    
+    /* PARSE PHOTOBOOTH CONFIG */
+    const parsedConfig = parseConfig();
+    log('USB target ', ...parsedConfig.drive);
+    
+
+
+    const getDriveInfo = ({drive}) => {
+        let json = null;
+        let device = false;
+    
+        drive = drive.toLowerCase();
+    
+        try {
+            //Assuming that the lsblk version supports JSON output!
+            const output = execSync('export LC_ALL=C; lsblk -ablJO 2>/dev/null; unset LC_ALL').toString();
+            json = JSON.parse(output);
+        } catch (err) {
+            log('ERROR: Could not parse the output of lsblk! Please make sure its installed and that it offers JSON output!');
+    
+            return null;
+        }
+    
+        if (!json || !json.blockdevices) {
+            log('ERROR: The output of lsblk was malformed!');
+    
+            return null;
+        }
+    
+        try {
+            device = json.blockdevices.find(
+                (blk) =>
+                    // eslint-disable-next-line implicit-arrow-linebreak
+                    blk.subsystems.includes('usb') &&
+                    ((blk.name && drive === blk.name.toLowerCase()) ||
+                        (blk.kname && drive === blk.kname.toLowerCase()) ||
+                        (blk.path && drive === blk.path.toLowerCase()) ||
+                        (blk.label && drive === blk.label.toLowerCase()))
+            );
+        } catch (err) {
+            device = false;
+        }
+    
+        return device;
+    };
+    
+    const mountDrive = (drive) => {
+        if (typeof drive.mountpoint === 'undefined' || !drive.mountpoint) {
+            try {
+                const mountRes = execSync(`export LC_ALL=C; udisksctl mount -b ${drive.path}; unset LC_ALL`).toString();
+                const mountPoint = mountRes
+                    .substr(mountRes.indexOf('at') + 3)
+                    .trim()
+                    .replace(/[\n.]/gu, '');
+    
+                drive.mountpoint = mountPoint;
+            } catch (error) {
+                log('ERROR: unable to mount drive', drive.path);
+                drive = null;
+            }
+        }
+    
+        return drive;
+    };
+
+    const startSync = ({dataAbsPath, drive}) => {
+        if (!fs.existsSync(dataAbsPath)) {
+            log(`ERROR: Folder [${dataAbsPath}] does not exist!`);
+    
+            return;
+        }
+    
+        log('Starting sync to USB drive ...');
+        log(`Source data folder [${dataAbsPath}]`);
+        log(`Syncing to drive [${drive.path}] -> [${drive.mountpoint}]`);
+
+        cmd = 'touch ' + dataAbsPath + '/copy.chk';
+        stdout = execSync(cmd);
+
+        if (fs.existsSync(path.join(drive.mountpoint, SYNC_DESTINATION_DIR + '/copy.chk'))) {
+            log('Last sync might not completet, Checkfile exists:', path.join(drive.mountpoint, SYNC_DESTINATION_DIR + '/copy.chk'));
+        }
+    
+        cmd = (() => {
+            switch (process.platform) {
+                case 'win32':
+                    return null;
+                case 'linux':
+                    // prettier-ignore
+                    return [
+                        'rsync',
+                        '-a',
+                        '--delete-before',
+                        '-b',
+                        `--backup-dir=${path.join(drive.mountpoint, 'deleted')}`,
+                        '--ignore-existing',
+                        '--include=\'*.\'{jpg,chk,gif,mp4}',
+                        '--include=\'*/\'',
+                        '--exclude=\'*\'',
+                        '--prune-empty-dirs',
+                        dataAbsPath,
+                        path.join(drive.mountpoint, SYNC_DESTINATION_DIR)
+                    ].join(' ');
+                default:
+                    return null;
+            }
+        })();
+    
+        if (!cmd) {
+            log('ERROR: No command for syncing!');
+    
+            return;
+        }
+    
+        log('Executing command: <', cmd, '>');
+
+        stdout = execSync(cmd);
+    
+
+        if (!fs.existsSync(path.join(drive.mountpoint, SYNC_DESTINATION_DIR + '/copy.chk'))) {
+            log('Sync error, Checkfile does not exist:', path.join(drive.mountpoint, SYNC_DESTINATION_DIR + '/copy.chk'));
+
+            return;
+        }
+        cmd = 'rm ' + path.join(drive.mountpoint, SYNC_DESTINATION_DIR + '/copy.chk');
+        stdout = execSync(cmd);
+    
+    };
+    
+    const unmountDrive = () => {
+        const driveInfo = getDriveInfo(parsedConfig);
+        const mountedDrive = mountDrive(driveInfo);
+    
+        if (mountedDrive) {
+            try {
+                execSync(`export LC_ALL=C; udisksctl unmount -b ${mountedDrive.path}; unset LC_ALL`).toString();
+                log('Unmounted drive', mountedDrive.path);
+            } catch (error) {
+                log('ERROR: unable to unmount drive', mountedDrive.path);
+            }
+        } else {
+            log('Nothing to umount');
+        }
+    };
+
+    /* Execution starts here */
+    
+    if (PLATFORM === 'win32') {
+        log('Windows is currently not supported!');
+        process.exit();
+    }
+
+
+    /*if (rsyncSemaphore) {*/
+        /*log(`WARN: Sync in progress, waiting for [${config.synctodrive.interval}] seconds`);*/
+
+        /*return;*/
+   /* }*/
+
+    log('Checking for USB drive');
+
+    const driveInfo = getDriveInfo(parsedConfig);
+        try {
+            log(`Processing drive ${driveInfo.label} -> ${driveInfo.path}`);
+        } catch (error) {
+            
+            return;
+        }
+
+    const mountedDrive = mountDrive(driveInfo);
+        try {
+            log(`Mounted drive ${mountedDrive.name} -> ${mountedDrive.mountpoint}`);
+        } catch (error) {
+            return;
+        }
+
+    if (mountedDrive) {
+        startSync({
+            dataAbsPath: parsedConfig.dataAbsPath,
+            drive: mountedDrive
+        });
+    }
+
+
+    log('Copy Files completed');
+    
+    /* umount drives here */
+    unmountDrive();
+
+    log('Delete Files from local disk -> to do');
+
+    /* To do */
+
+    if (config.remotebuzzer.useleds && config.remotebuzzer.move2usbled) {
+        move2usbled.writeSync(0);
+    }
+    
+    photoboothAction('completed');
+}
+
+
 
 log('Initialization completed');
