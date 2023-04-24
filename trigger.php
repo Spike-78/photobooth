@@ -66,11 +66,11 @@ $uiShape = 'shape--' . $config['ui']['style'];
 			    <?php endif; ?>
 
 			    <?php if ($config['remotebuzzer']['rebootbutton']): ?>
-			    <a href="#" class="<?php echo $btnClass; ?> remoteReboot" onclick="photoboothTools.getRequest('http://' + config.webserver.ip + ':' + config.remotebuzzer.port + '/commands/reboot-now');"><i class="fa fa-exclamation-triangle" aria-hidden="true"></i> <span data-i18n="reboot"></span></a>
+			    <a href="#" class="<?php echo $btnClass; ?> remoteReboot" onclick="photoboothTools.getRequest('http://' + config.webserver.ip + ':' + config.remotebuzzer.port + '/commands/reboot-now');"><i class="fa fa-exclamation-triangle" aria-hidden="true"></i> <span data-i18n="reboot_button"></span></a>
 			    <?php endif; ?>
 
 			    <?php if ($config['remotebuzzer']['shutdownbutton']): ?>
-			    <a href="#" class="<?php echo $btnClass; ?> remoteShutdown" onclick="photoboothTools.getRequest('http://' + config.webserver.ip + ':' + config.remotebuzzer.port + '/commands/shutdown-now');"><i class="fa fa-exclamation-triangle" aria-hidden="true"></i> <span data-i18n="shutdown"></span></a>
+			    <a href="#" class="<?php echo $btnClass; ?> remoteShutdown" onclick="photoboothTools.getRequest('http://' + config.webserver.ip + ':' + config.remotebuzzer.port + '/commands/shutdown-now');"><i class="fa fa-exclamation-triangle" aria-hidden="true"></i> <span data-i18n="shutdown_button"></span></a>
 			    <?php endif; ?>
 
 			<?php endif; ?>
