@@ -9,21 +9,18 @@ let collageInProgress = false,
     printled,
     videoled,
     customled,
-    move2usbled;
+    move2usbled,
+    copySucess = false;
 
 const API_DIR_NAME = 'api';
 const API_FILE_NAME = 'config.php';
 const SYNC_DESTINATION_DIR = 'photobooth-pic-sync';
 /*const PID = process.pid;*/
 let rotaryClkPin, rotaryDtPin;
-/*const {execSync, spawn} = require('child_process');*/
-const {execSync} = require('child_process');
+const {execSync, spawnSync} = require('child_process');
+/*const {execSync} = require('child_process');*/
 const path = require('path');
-/*const events = require('events');*/
 const {pid: PID, platform: PLATFORM} = process;
-/*const myEmitter = new events.EventEmitter();*/
-/*let rsyncSemaphore = null;*/
-/*let rsyncStartTime = 0;*/
 
 
 /* LOGGING FUNCTION */
@@ -1233,8 +1230,6 @@ function move2usbAction() {
     if (config.remotebuzzer.useleds && config.remotebuzzer.move2usbled) {
         move2usbled.writeSync(1);
     }
-
-    log('Move2USB');
    
     const parseConfig = () => {
         try {
@@ -1327,8 +1322,10 @@ function move2usbAction() {
         cmd = 'touch ' + dataAbsPath + '/copy.chk';
         stdout = execSync(cmd);
 
-        if (fs.existsSync(path.join(drive.mountpoint, SYNC_DESTINATION_DIR + '/copy.chk'))) {
-            log('Last sync might not completet, Checkfile exists:', path.join(drive.mountpoint, SYNC_DESTINATION_DIR + '/copy.chk'));
+        if (fs.existsSync(path.join(drive.mountpoint, SYNC_DESTINATION_DIR + '/data/copy.chk'))) {
+            log(' ');
+            log('[WARNING] Last sync might not completed, Checkfile exists:', path.join(drive.mountpoint, SYNC_DESTINATION_DIR + '/copy.chk'));
+            log(' ');
         }
     
         cmd = (() => {
@@ -1364,15 +1361,34 @@ function move2usbAction() {
     
         log('Executing command: <', cmd, '>');
 
-        stdout = execSync(cmd);
+        try {
+            spawnSync(cmd, {
+                shell: '/bin/bash',
+                stdio: 'ignore'
+            });
+        } catch (err) {
+            log('ERROR: Could not start rsync:', err.toString());
     
+            return;
+        }
+    
+        log('Sync completed');
 
-        if (!fs.existsSync(path.join(drive.mountpoint, SYNC_DESTINATION_DIR + '/copy.chk'))) {
-            log('Sync error, Checkfile does not exist:', path.join(drive.mountpoint, SYNC_DESTINATION_DIR + '/copy.chk'));
+
+        if (fs.existsSync(path.join(drive.mountpoint, SYNC_DESTINATION_DIR + '/data/copy.chk'))) {
+            copySucess = true;
+        }else{
+            log(' ');
+            log('[ERROR] Sync error, sync might be not sucessfull. Checkfile does not exist:', path.join(drive.mountpoint, SYNC_DESTINATION_DIR + '/data/copy.chk'));
+            log(' ');
+            copySucess = false;
 
             return;
         }
-        cmd = 'rm ' + path.join(drive.mountpoint, SYNC_DESTINATION_DIR + '/copy.chk');
+        cmd = 'rm ' + path.join(drive.mountpoint, SYNC_DESTINATION_DIR + '/data/copy.chk');
+        stdout = execSync(cmd);
+
+        cmd = 'rm ' + dataAbsPath + '/copy.chk';
         stdout = execSync(cmd);
     
     };
@@ -1393,19 +1409,24 @@ function move2usbAction() {
         }
     };
 
+
+    const deleteFiles = () => {
+        if (!copySucess) {
+            log('[Warning] Sync was unsuccessful. No files will be deleted.');
+
+            return;
+        }
+
+        log('Deleting Files...');
+
+    };
+
     /* Execution starts here */
     
     if (PLATFORM === 'win32') {
         log('Windows is currently not supported!');
         process.exit();
     }
-
-
-    /*if (rsyncSemaphore) {*/
-        /*log(`WARN: Sync in progress, waiting for [${config.synctodrive.interval}] seconds`);*/
-
-        /*return;*/
-   /* }*/
 
     log('Checking for USB drive');
 
@@ -1430,16 +1451,16 @@ function move2usbAction() {
             drive: mountedDrive
         });
     }
-
-
-    log('Copy Files completed');
     
     /* umount drives here */
-    unmountDrive();
+    /*unmountDrive();*/
 
-    log('Delete Files from local disk -> to do');
+    /* delete Files */
+    deleteFiles ();
 
     /* To do */
+    /* delete */
+    /* rebuild Database */
 
     if (config.remotebuzzer.useleds && config.remotebuzzer.move2usbled) {
         move2usbled.writeSync(0);
