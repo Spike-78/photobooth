@@ -158,7 +158,7 @@ const startSync = ({dataAbsPath, drive}) => {
 
     try {
         rsyncSemaphore = spawn(cmd, {
-            shell: true,
+            shell: '/bin/bash',
             stdio: 'ignore'
         });
     } catch (err) {
