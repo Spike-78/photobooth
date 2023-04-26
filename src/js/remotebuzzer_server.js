@@ -1235,7 +1235,8 @@ function move2usbAction() {
         try {
             return {
                 dataAbsPath: config.foldersAbs.data,
-                drive: config.synctodrive.target
+                drive: config.synctodrive.target,
+                dbName: config.database.file
             };
         } catch (err) {
             log('ERROR: unable to parse sync-to-drive config', err);
@@ -1410,7 +1411,12 @@ function move2usbAction() {
     };
 
 
-    const deleteFiles = () => {
+    const deleteFiles = ({dataAbsPath}) => {
+        if (!fs.existsSync(dataAbsPath)) {
+            log(`ERROR: Folder [${dataAbsPath}] does not exist!`);
+    
+            return;
+        }
         if (!copySucess) {
             log('[Warning] Sync was unsuccessful. No files will be deleted.');
 
@@ -1418,6 +1424,56 @@ function move2usbAction() {
         }
 
         log('Deleting Files...');
+        
+        cmd = (() => {
+            switch (process.platform) {
+                case 'win32':
+                    return null;
+                case 'linux':
+                    // prettier-ignore
+                    return [
+                        'find',
+                        dataAbsPath,
+                        '-type f \\(',
+                        '-name \'*.jpg\'',
+                        '-o',
+                        '-name \'*.gif\'',
+                        '-o',
+                        '-name \'*.mp4\'',
+                        '\\)',
+                        '-exec rm -rv {}',
+                        '\\;'
+                    ].join(' ');
+                default:
+                    return null;
+            }
+        })();
+        
+        log('Executing command: <', cmd, '>');
+
+        stdout = execSync(cmd);
+
+    };
+
+    const deleteDatabase = ({dataAbsPath, dbName}) => {
+        if (!fs.existsSync(dataAbsPath)) {
+            log(`ERROR: Folder [${dataAbsPath}] does not exist!`);
+    
+            return;
+        }
+        if (!copySucess) {
+            log('[Warning] Sync was unsuccessful. No files will be deleted.');
+
+            return;
+        }
+
+        log('Deleting Database...');
+        
+        cmd = 'rm ' + path.join(dataAbsPath, dbName +'.txt');
+     
+        log('Executing command: <', cmd, '>');
+
+        stdout = execSync(cmd);
 
     };
 
@@ -1452,15 +1508,22 @@ function move2usbAction() {
         });
     }
     
-    /* umount drives here */
-    /*unmountDrive();*/
+    unmountDrive();
 
-    /* delete Files */
-    deleteFiles ();
+    if (copySucess) {
+        deleteFiles ({dataAbsPath: parsedConfig.dataAbsPath});
+    }else{
+        log('[Warning] Sync was unsuccessful. No files will be deleted.');
+    }
 
-    /* To do */
-    /* delete */
-    /* rebuild Database */
+    if (copySucess) {
+        deleteDatabase ({
+            dataAbsPath: parsedConfig.dataAbsPath, 
+            dbName: parsedConfig.dbName
+        });
+    }else{
+        log('[Warning] Sync was unsuccessful. Database  will not be deleted.');
+    }
 
     if (config.remotebuzzer.useleds && config.remotebuzzer.move2usbled) {
         move2usbled.writeSync(0);
