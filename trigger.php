@@ -76,8 +76,8 @@ $uiShape = 'shape--' . $config['ui']['style'];
 			<?php endif; ?>
 
 			<?php if ($config['remotebuzzer']['userotary']): ?>
-			    <a href="#" class="<?php echo $btnClass; ?> remoteNext" onclick="photoboothTools.getRequest('http://' + config.webserver.ip + ':' + config.remotebuzzer.port + '/commands/rotary-cw');"><i class="fa fa-chevron-left" aria-hidden="true"></i> <span data-i18n="next_element"></span></a>
-			    <a href="#" class="<?php echo $btnClass; ?> remotePrevious" onclick="photoboothTools.getRequest('http://' + config.webserver.ip + ':' + config.remotebuzzer.port + '/commands/rotary-ccw');"><i class="fa fa-chevron-right" aria-hidden="true"></i> <span data-i18n="previous_element"></span></a>
+			    <a href="#" class="<?php echo $btnClass; ?> remotePrevious" onclick="photoboothTools.getRequest('http://' + config.webserver.ip + ':' + config.remotebuzzer.port + '/commands/rotary-ccw');"><i class="fa fa-chevron-left" aria-hidden="true"></i> <span data-i18n="previous_next"></span></a>
+                <a href="#" class="<?php echo $btnClass; ?> remoteNext" onclick="photoboothTools.getRequest('http://' + config.webserver.ip + ':' + config.remotebuzzer.port + '/commands/rotary-cw');"><i class="fa fa-chevron-right" aria-hidden="true"></i> <span data-i18n="next_element"></span></a>
 			    <a href="#" class="<?php echo $btnClass; ?> remoteClick" onclick="photoboothTools.getRequest('http://' + config.webserver.ip + ':' + config.remotebuzzer.port + '/commands/rotary-btn-press');"><i class="fa fa-circle" aria-hidden="true"></i> <span data-i18n="click_element"></span></a>
 		    <?php endif; ?>
 		</div>
