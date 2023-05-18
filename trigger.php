@@ -54,11 +54,11 @@ $uiShape = 'shape--' . $config['ui']['style'];
 			    <?php endif; ?>
 
 			    <?php if ($config['custom']['enabled'] && $config['remotebuzzer']['custombutton']): ?>
-			    <a href="#" class="<?php echo $btnClass; ?> remoteCustom" onclick="photoboothTools.getRequest('http://' + config.webserver.ip + ':' + config.remotebuzzer.port + '/commands/start-custom');"><i class="<?php echo $config['icons']['take_custom'] ?>"></i> <span data-i18n="takeCollage"></span></a>
+			    <a href="#" class="<?php echo $btnClass; ?> remoteCustom" onclick="photoboothTools.getRequest('http://' + config.webserver.ip + ':' + config.remotebuzzer.port + '/commands/start-custom');"><i class="<?php echo $config['icons']['take_custom'] ?>"></i> <span><?php echo $config['custom']['btn_text'] ?></span></a>
 			    <?php endif; ?>
 
 			    <?php if ($config['video']['enabled'] && $config['remotebuzzer']['videobutton']): ?>
-			    <a href="#" class="<?php echo $btnClass; ?> remoteVideo" onclick="photoboothTools.getRequest('http://' + config.webserver.ip + ':' + config.remotebuzzer.port + '/commands/start-video');"><i class="<?php echo $config['icons']['take_video'] ?>"></i> <span><?php echo $config['custom']['btn_text'] ?></span></a>
+			    <a href="#" class="<?php echo $btnClass; ?> remoteVideo" onclick="photoboothTools.getRequest('http://' + config.webserver.ip + ':' + config.remotebuzzer.port + '/commands/start-video');"><i class="<?php echo $config['icons']['take_video'] ?>"></i> <span data-i18n="takeVideo"></span></a>
 			    <?php endif; ?>
 
 			    <?php if ($config['print']['from_result'] && $config['remotebuzzer']['printbutton']): ?>
