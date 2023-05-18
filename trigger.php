@@ -61,7 +61,7 @@ $uiShape = 'shape--' . $config['ui']['style'];
 			    <a href="#" class="<?php echo $btnClass; ?> remoteVideo" onclick="photoboothTools.getRequest('http://' + config.webserver.ip + ':' + config.remotebuzzer.port + '/commands/start-video');"><i class="<?php echo $config['icons']['take_video'] ?>"></i> <span><?php echo $config['custom']['btn_text'] ?></span></a>
 			    <?php endif; ?>
 
-			    <?php if ($config['print']['enabled'] && $config['remotebuzzer']['printbutton']): ?>
+			    <?php if ($config['print']['from_result'] && $config['remotebuzzer']['printbutton']): ?>
 			    <a href="#" class="<?php echo $btnClass; ?> remotePrint" onclick="photoboothTools.getRequest('http://' + config.webserver.ip + ':' + config.remotebuzzer.port + '/commands/start-print');"><i class="<?php echo $config['icons']['print'] ?>"></i> <span data-i18n="print"></span></a>
 			    <?php endif; ?>
 
